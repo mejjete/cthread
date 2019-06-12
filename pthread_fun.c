@@ -82,7 +82,7 @@ int futex_wake(int *futex)
 
 void futex_lock(int *futex)
 {
-    while(__sync_val_compare_and_swap(futex, 0, 1) !== 0)
+    while(__sync_val_compare_and_swap(futex, 0, 1) != 0)
         futex_wait(futex, 1);
 }
 
