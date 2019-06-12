@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <linux/sched.h>
 #include <linux/futex.h>
+#include <setjmp.h>
 //#include "pthread.h"
 
 typedef int (*cthread_f)(void*);
@@ -20,12 +21,21 @@ struct cthread
   void *arg;
   void *stack;
   bool is_finished;
+  bool is_detached;
+  jmp_buf jmp;
+};
+
+struct cthread_stack
+{
+    pid_t tid;
+    void *stack;
+    struct cthread_stack *next;
 };
 
 volatile bool is_finished = false;
 int counter = 0;
 
-int thread_create_clone(int (*func)(void *), void *arg, void **stack);
+static inline int thread_create_clone(int (*func)(void *), void *arg, void **stack /*pid_t *tid*/);
 
 void spin_lock(volatile bool *lock);
 void spin_unlock(volatile bool *lock);
@@ -34,6 +44,13 @@ int futex_wait(int *futex, int val);
 int futex_wake(int *futex);
 void futex_lock(int *futex);
 void futex_unlock(int *futex);
+
+int cthread_join(volatile struct cthread *thread);
+void cthread_create(struct cthread *result, cthread_f func, void *arg);
+int cthread_runner(void *arg);
+void ctread_exit(struct cthread *thread, int retcode);
+void cthread_destroy(struct cthread *thread);
+void cthread_detach(struct cthread *thread);
 
 //int pthread_create(pthread_t *thread, /* const pthread_attr_t *attr, void *(*start)(void *)*/ int (*func)(void *), void *arg);
 //int pthread_join(pthread_t *thread_id);
@@ -102,7 +119,7 @@ void futex_unlock(int *futex)
     futex_wake(futex);
 }
 
-int thread_create_clone(int (*func)(void *), void *arg, void **stack)
+static inline int thread_create_clone(int (*func)(void *), void *arg, void **stack /*pid_t *tid*/)
 {
     int stack_size = 65 * 1024;
     *stack = malloc(stack_size);
@@ -145,9 +162,22 @@ int pthread_join(pthread_t *thread_id)
 int cthread_runner(void *arg)
 {
     struct cthread *thread = (struct cthread *) arg;
-    thread->returned_code = thread->func(thread->arg);
+    if(setjmp(thread->jmp) == 0)
+    {
+        arg = thread->arg;
+        thread->returned_code = thread->func(thread->arg);
+    }
+    if(thread->is_detached)
+        cthread_destroy(thread);
     thread->is_finished = true;
     return 0;
+}
+
+void cthread_detach(struct cthread *thread)
+{
+    if(thread->is_finished)
+        cthread_destroy(thread);
+    thread->is_detached = true;
 }
 
 void cthread_create(struct cthread *result, cthread_f func, void *arg)
@@ -156,6 +186,7 @@ void cthread_create(struct cthread *result, cthread_f func, void *arg)
     result->func = func;
     result->arg = arg;
     result->is_finished = false;
+    result->is_detached = false;
     thread_create_clone(cthread_runner, (void*) result, &result->stack);
 }
 
@@ -165,4 +196,16 @@ int cthread_join(volatile struct cthread *thread)
         sched_yield();
     free(thread->stack);
     return thread->returned_code;
+}
+
+void ctread_exit(struct cthread *thread, int retcode)
+{
+    thread->returned_code = retcode;
+    longjmp(thread->jmp, 1);
+}
+
+void cthread_destroy(struct cthread *thread)
+{
+    printf("thread is destroyed\n");
+    free(thread->stack);
 }
