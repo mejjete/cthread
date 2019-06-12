@@ -22,9 +22,8 @@ void spin_unlock(volatile bool *lock);
 
 int futex_wait(int *futex, int val);
 int futex_wake(int *futex);
-
 void futex_lock(int *futex);
-void *futex_unlock(int *futex);
+void futex_unlock(int *futex);
 
 //int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start)(void *), void *arg);
 
@@ -86,7 +85,7 @@ void futex_lock(int *futex)
         futex_wait(futex, 1);
 }
 
-void *futex_unlock(int *futex)
+void futex_unlock(int *futex)
 {
     __sync_bool_compare_and_swap(futex, 1, 0);
     futex_wake(futex);
