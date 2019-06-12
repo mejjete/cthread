@@ -92,4 +92,6 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 
 int pthread_join(pthread_t thread_id, void **data);
 
+int pthread_cancel(pthread_t thread_id);
+
 #endif
