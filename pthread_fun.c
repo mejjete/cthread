@@ -16,8 +16,15 @@ volatile bool is_finished = false;
 int counter = 0;
 
 int thread_create_clone(int (*func)(void *), void *arg, void **stack);
+
 void spin_lock(volatile bool *lock);
 void spin_unlock(volatile bool *lock);
+
+int futex_wait(int *futex, int val);
+int futex_wake(int *futex);
+
+void futex_lock(int *futex);
+void *futex_unlock(int *futex);
 
 //int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start)(void *), void *arg);
 
