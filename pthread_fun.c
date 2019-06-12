@@ -48,3 +48,8 @@ int thread_create_clone(int (*func)(void *), void *arg, void **stack)
     int flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_THREAD;
     return clone(func, stack_top, flags, arg);
 }
+
+int a()
+{
+    return 0;
+}
