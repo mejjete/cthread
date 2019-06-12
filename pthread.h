@@ -1,6 +1,7 @@
 //x64 system
 #ifndef _PTHREAD_H
 #define _PTHREAD_H
+#include <sys/types.h>
 
 #ifndef _BITS_PTHREADTYPES_H
 #define _BITS_PTHREADTYPES_H 1 
@@ -43,7 +44,30 @@
 
 
 
-typedef unsigned long int pthread_t;                 //thread inditification
+//typedef unsigned long int pthread_t;                 //thread inditification
+
+typedef struct pthread
+{
+  bool is_finished;
+  pid_t tid;
+  int (*func)(void*);
+  void **stack;
+  void *arg;
+  int returned_code;
+  int flags;
+  size_t stack_size;
+  size_t stack_top;
+}pthread_t;
+
+typedef int (*cthread_f)(void*);
+struct cthread
+{
+  int returned_code;
+  cthread_f func;
+  void *arg;
+  void *stack;
+  bool is_finished;
+};
 
 
 typedef struct mutex
@@ -78,11 +102,11 @@ typedef struct p_once
 }pthread_once_t;                                //context control dynamical intializion
 
 
-union pthread_attr_t
+/*union pthread_attr_t
 {
   char __size[__SIZEOF_PTHREAD_ATTR_T];
   long int __align;
-};
+};*/
 
 typedef union pthread_attr_t pthread_attr_t;    //atributes thread
 

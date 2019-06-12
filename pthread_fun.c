@@ -12,6 +12,16 @@
 #include <linux/futex.h>
 //#include "pthread.h"
 
+typedef int (*cthread_f)(void*);
+struct cthread
+{
+  int returned_code;
+  cthread_f func;
+  void *arg;
+  void *stack;
+  bool is_finished;
+};
+
 volatile bool is_finished = false;
 int counter = 0;
 
@@ -25,7 +35,8 @@ int futex_wake(int *futex);
 void futex_lock(int *futex);
 void futex_unlock(int *futex);
 
-//int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start)(void *), void *arg);
+//int pthread_create(pthread_t *thread, /* const pthread_attr_t *attr, void *(*start)(void *)*/ int (*func)(void *), void *arg);
+//int pthread_join(pthread_t *thread_id);
 
 int thread_f(void *arg)
 {
@@ -111,12 +122,47 @@ void spin_unlock(volatile bool *lock)
     __sync_bool_compare_and_swap(lock, 1, 0);
 }
 
-/*int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start)(void *), void *arg)
+/*int pthread_create(pthread_t *thread,  const pthread_attr_t *attr, void *(*start)(void *)int (*func)(void *), void *arg)
 {
-    int stack_size = 65 * 1024;
-    void *stack = malloc(stack_size);
-    *stack_top = (char *) *stack + stack_size;
-    int flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_THREAD; 
-    *thread = (pthread_t*)clone(start, stack_top, flags, attr);
-    return *thread == 0 ? 0 : 1;
+    if(thread == NULL)
+        thread = (pthread_t *) malloc(sizeof(pthread_t));
+    thread->returned_code = 0;
+    thread->func = func;
+    thread->arg = arg;
+    thread->is_finished = false;
+    thread->stack_size = 65 * 1024;
+    return thread_create_clone(thread->func, thread->arg, thread->stack);
+}
+
+int pthread_join(pthread_t *thread_id)
+{
+    while(!thread_id->is_finished)
+        sched_yield();
+    free(thread_id->stack);
+    return thread_id->returned_code;
 }*/
+
+int cthread_runner(void *arg)
+{
+    struct cthread *thread = (struct cthread *) arg;
+    thread->returned_code = thread->func(thread->arg);
+    thread->is_finished = true;
+    return 0;
+}
+
+void cthread_create(struct cthread *result, cthread_f func, void *arg)
+{
+    result->returned_code = 0;
+    result->func = func;
+    result->arg = arg;
+    result->is_finished = false;
+    thread_create_clone(cthread_runner, (void*) result, &result->stack);
+}
+
+int cthread_join(volatile struct cthread *thread)
+{
+    while(!thread->is_finished)
+        sched_yield();
+    free(thread->stack);
+    return thread->returned_code;
+}
