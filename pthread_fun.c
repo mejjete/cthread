@@ -35,7 +35,7 @@ struct cthread_stack
 volatile bool is_finished = false;
 int counter = 0;
 
-static inline int thread_create_clone(int (*func)(void *), void *arg, void **stack /*pid_t *tid*/);
+int thread_create_clone(int (*func)(void *), void *arg, void **stack /*pid_t *tid*/);
 
 void spin_lock(volatile bool *lock);
 void spin_unlock(volatile bool *lock);
@@ -66,29 +66,20 @@ int thread_f(void *arg)
 
 int thread_d(void *arg)
 {
-    printf("child thread\n");
-    int i;
-    for(i = 0; i < 100000; ++i)
-        __sync_add_and_fetch(&counter, 1);
-    is_finished = true;
+    printf("*****\nchild thread\n*****\n");
     return 0;
 }
 
 int main()
 {   
-    printf("test\n");
     //pid_t thread_id = getpid();
     //pid_t pid = getpid();
     //printf("pid: %d, tid: %d new thread\n", (int)pid, (int)thread_id);
-    void *stack;
-    int arg = 100;
-    int ret = thread_create_clone(thread_d, NULL, &stack);
-    for(int i = 0; i < 100000; ++i)
-        __sync_add_and_fetch(&counter, 1);
+    struct cthread thread;
+    int a = 18;
+    cthread_create(&thread, thread_f, (void *) &a);
     while(!is_finished)
         sched_yield();
-    printf("counter %d\n", counter);
-    free(stack);
     //printf("pid %d, tid %d: clone result = %d\n", (int)pid, (int)thread_id, ret);
     /*for(int i = 0; i < 100000; i++)
         __sync_add_and_fetch(&counter, 1);
@@ -119,12 +110,13 @@ void futex_unlock(int *futex)
     futex_wake(futex);
 }
 
-static inline int thread_create_clone(int (*func)(void *), void *arg, void **stack /*pid_t *tid*/)
+int thread_create_clone(int (*func)(void *), void *arg, void **stack /*pid_t *tid*/)
 {
     int stack_size = 65 * 1024;
     *stack = malloc(stack_size);
     void *stack_top = (char *) *stack + stack_size;
     int flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_THREAD;
+    printf("thread_create_clone\n");
     return clone(func, stack_top, flags, arg); 
 }
 
@@ -161,12 +153,15 @@ int pthread_join(pthread_t *thread_id)
 
 int cthread_runner(void *arg)
 {
+    printf("cthread_runner\n");
     struct cthread *thread = (struct cthread *) arg;
     if(setjmp(thread->jmp) == 0)
     {
         arg = thread->arg;
+        printf("cthread_runner: test: 160\narg: %d", *((int*)arg) );
         thread->returned_code = thread->func(thread->arg);
     }
+    printf("cthread_runner: test: 162\n");
     if(thread->is_detached)
         cthread_destroy(thread);
     thread->is_finished = true;
@@ -182,6 +177,8 @@ void cthread_detach(struct cthread *thread)
 
 void cthread_create(struct cthread *result, cthread_f func, void *arg)
 {
+    
+    printf("cthread_Create\n");
     result->returned_code = 0;
     result->func = func;
     result->arg = arg;
