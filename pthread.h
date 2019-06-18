@@ -111,8 +111,7 @@ typedef struct p_once
 typedef union pthread_attr_t pthread_attr_t;    //atributes thread
 
 
-int pthread_create(pthread_t *thread, const pthread_attr_t *attr, 
-                  void *(*start)(void *), void *arg);
+int pthread_create(pthread_t *thread, void *(*start)(void *), void *arg);
 
 int pthread_join(pthread_t thread_id, void **data);
 
