@@ -65,27 +65,33 @@ int thread_f(void *arg)
     pid_t thread_id = getpid();
     pid_t pid = getpid();
     printf("pid %d, tid %d: new thread, arg = %d\n", (int)pid, (int)thread_id, *((int*)arg));
-    is_finished = true;
     return 0;
 }
 
 int thread_d(void *arg)
 {
     struct imp *answer = (struct imp *) arg;
-    printf("a: %d\nb: %d\n", answer->a, answer->b);
+    printf("thread started\n");
     return 0;
 }
 
 int main()
 {
-    struct cthread thread;
-    struct imp answer;
-    answer.a = 10;
-    answer.b = 87;
-    answer.res = NULL;
-    int a = 18;
-    cthread_create(&thread, thread_d, (void *) &answer);
-    cthread_join(&thread);
+    struct cthread thread[5];
+    for(int i = 0; i < 5; i++)
+    {
+        cthread_create(&thread[i], thread_d, NULL);
+        cthread_detach(&thread[i]);
+    }
+    for(int i = 0; i < 5; i++)
+    {
+        if(!thread[i].is_finished)
+        {
+            i = 0;
+            sched_yield();
+        }
+    }
+    printf("detached thread finished\n");
     return 0;
 }
 
@@ -116,8 +122,9 @@ int thread_create_clone(int (*func)(void *), void *arg, void **stack, pid_t *tid
     int stack_size = 65 * 1024;
     *stack = malloc(stack_size);
     void *stack_top = (char *) *stack + stack_size;
-    int flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_THREAD;
-    return clone(func, stack_top, flags, arg);
+    int flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_THREAD |
+                CLONE_CHILD_CLEARTID | CLONE_CHILD_SETTID;
+    return clone(func, stack_top, flags, arg, NULL, NULL, tid);
 }
 
 void spin_lock(volatile bool *lock)
@@ -136,22 +143,15 @@ int cthread_runner(void *arg)
     struct cthread *thread = (struct cthread *) arg;
     if(setjmp(thread->jmp) == 0)
     {
-        arg = thread->arg;
-        thread->returned_code = thread->func(thread->arg);
+      arg = thread->arg;
+      thread->returned_code = thread->func(thread->arg);
     }
+    spin_lock(&thread->lock);
     if(thread->is_detached)
         cthread_destroy(thread);
     thread->is_finished = true;
-    return 0;
-}
-
-void cthread_detach(struct cthread *thread)
-{
-    spin_lock(&thread->lock);
-    if(thread->is_finished)
-        cthread_destroy(thread);
-    thread->is_detached = true;
     spin_unlock(&thread->lock);
+    return 0;
 }
 
 void cthread_create(struct cthread *result, cthread_f func, void *arg)
@@ -183,23 +183,32 @@ void ctread_exit(struct cthread *thread, int retcode)
     longjmp(thread->jmp, 1);
 }
 
+void cthread_detach(struct cthread *thread)
+{
+    spin_lock(&thread->lock);
+    if(thread->is_finished)
+        cthread_destroy(thread);
+    thread->is_detached = true;
+    spin_unlock(&thread->lock);
+}
+
 void cthread_destroy(struct cthread *thread)
 {
-  printf("thread is destroyed\n");
-  spin_lock(&last_stack_lost);
-  struct cthread_stack *iter = stack_list;
-  while(iter != NULL)
-  {
-    if(iter->tid != 0)
-      break;
-    struct cthread_stack *next = iter->next;
-    free(iter->stack);
-    free(iter);
-    iter = next;
-    printf("a stack is freed\n");
-  }
-  thread->stack->next = iter;
-  stack_list = thread->stack;
-  spin_unlock(&last_stack_lost);
-  free(thread->stack);
+    printf("thread is destroyed\n");
+    spin_lock(&last_stack_lost);
+    struct cthread_stack *iter = stack_list;
+    while(iter != NULL)
+    {
+      if(iter->tid != 0)
+        break;
+      struct cthread_stack *next = iter->next;
+      free(iter->stack);
+      free(iter);
+      iter = next;
+      printf("a stack is freed\n");
+    }
+    thread->stack->next = iter;
+    stack_list = thread->stack;
+    spin_unlock(&last_stack_lost);
+    free(thread->stack);
 }
