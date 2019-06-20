@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include <syscall.h>
+#include <syscall.h>  
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/utsname.h>
@@ -78,8 +78,7 @@ int main()
     struct cthread thread;
     int a = 18;
     cthread_create(&thread, thread_f, (void *) &a);
-    while(!is_finished)
-        sched_yield();
+    cthread_join(&thread);
     //printf("pid %d, tid %d: clone result = %d\n", (int)pid, (int)thread_id, ret);
     /*for(int i = 0; i < 100000; i++)
         __sync_add_and_fetch(&counter, 1);
