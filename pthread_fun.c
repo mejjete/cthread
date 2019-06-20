@@ -19,7 +19,8 @@ struct cthread
   int returned_code;
   cthread_f func;
   void *arg;
-  void *stack;
+  struct cthread_stack *stack;
+  bool lock;
   bool is_finished;
   bool is_detached;
   jmp_buf jmp;
@@ -35,7 +36,7 @@ struct cthread_stack
 volatile bool last_stack_lost = false;
 struct cthread_stack *stack_list = NULL;
 
-int thread_create_clone(int (*func)(void *), void *arg, void **stack /*pid_t *tid*/);
+int thread_create_clone(int (*func)(void *), void *arg, void **stack, pid_t *tid);
 
 void spin_lock(volatile bool *lock);
 void spin_unlock(volatile bool *lock);
@@ -110,7 +111,7 @@ void futex_unlock(int *futex)
     futex_wake(futex);
 }
 
-int thread_create_clone(int (*func)(void *), void *arg, void **stack /*pid_t *tid*/)
+int thread_create_clone(int (*func)(void *), void *arg, void **stack, pid_t *tid)
 {
     int stack_size = 65 * 1024;
     *stack = malloc(stack_size);
@@ -158,7 +159,12 @@ void cthread_create(struct cthread *result, cthread_f func, void *arg)
     result->arg = arg;
     result->is_finished = false;
     result->is_detached = false;
-    thread_create_clone(cthread_runner, (void*) result, &result->stack);
+    result->lock = false;
+    result->stack = malloc(sizeof(*result->stack));
+    result->stack->next = NULL;
+    void **stack_p = &result->stack->stack;
+    pid_t *tid_p = &result->stack->tid;
+    thread_create_clone(cthread_runner, (void*) result, stack_p, tid_p);
 }
 
 int cthread_join(volatile struct cthread *thread)
