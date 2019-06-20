@@ -185,6 +185,21 @@ void ctread_exit(struct cthread *thread, int retcode)
 
 void cthread_destroy(struct cthread *thread)
 {
-    printf("thread is destroyed\n");
-    free(thread->stack);
+  printf("thread is destroyed\n");
+  spin_lock(&last_stack_lost);
+  struct cthread_stack *iter = stack_list;
+  while(iter != NULL)
+  {
+    if(iter->tid != 0)
+      break;
+    struct cthread_stack *next = iter->next;
+    free(iter->stack);
+    free(iter);
+    iter = next;
+    printf("a stack is freed\n");
+  }
+  thread->stack->next = iter;
+  stack_list = thread->stack;
+  spin_unlock(&last_stack_lost);
+  free(thread->stack);
 }
