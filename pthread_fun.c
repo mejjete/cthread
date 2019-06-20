@@ -147,9 +147,11 @@ int cthread_runner(void *arg)
 
 void cthread_detach(struct cthread *thread)
 {
+    spin_lock(&thread->lock);
     if(thread->is_finished)
         cthread_destroy(thread);
     thread->is_detached = true;
+    spin_unlock(&thread->lock);
 }
 
 void cthread_create(struct cthread *result, cthread_f func, void *arg)
