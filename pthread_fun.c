@@ -15,7 +15,7 @@
 //#include "pthread.h"
 
 typedef void *(*cthread_f)(void*);
-struct cthread
+typedef struct cthread
 {
     void *returned_code;
     cthread_f func;
@@ -25,7 +25,7 @@ struct cthread
     bool is_finished;
     bool is_detached;
     jmp_buf jmp;
-};
+}cthread_t;
 
 struct cthread_stack
 {
@@ -47,12 +47,12 @@ int futex_wake(int *futex);
 void futex_lock(int *futex);
 void futex_unlock(int *futex);
 
-void *cthread_join(volatile struct cthread *thread);
-void cthread_create(struct cthread *result, cthread_f func, void *arg);
+void *cthread_join(volatile cthread_t *thread);
+void cthread_create(cthread_t *result, cthread_f func, void *arg);
 void *cthread_runner(void *arg);
-void ctread_exit(struct cthread *thread, int retcode);
-void cthread_destroy(struct cthread *thread);
-void cthread_detach(struct cthread *thread);
+void ctread_exit(cthread_t *thread, int retcode);
+void cthread_destroy(cthread_t *thread);
+void cthread_detach(cthread_t *thread);
 
 struct imp
 {
@@ -78,7 +78,7 @@ void *thread_d(void *arg)
 
 int main()
 {
-    struct cthread thread[5];
+    cthread_t thread[5];
     for(int i = 0; i < 5; i++)
     {
         cthread_create(&thread[i], thread_d, NULL);
@@ -141,7 +141,7 @@ void spin_unlock(volatile bool *lock)
 
 void *cthread_runner(void *arg)
 {
-    struct cthread *thread = (struct cthread *) arg;
+    cthread_t *thread = (cthread_t *) arg;
     if(setjmp(thread->jmp) == 0)
     {
       arg = thread->arg;
@@ -155,7 +155,7 @@ void *cthread_runner(void *arg)
     return 0;
 }
 
-void cthread_create(struct cthread *result, cthread_f func, void *arg)
+void cthread_create(cthread_t *result, cthread_f func, void *arg)
 {
     result->returned_code = NULL;
     result->func = func;
@@ -170,7 +170,7 @@ void cthread_create(struct cthread *result, cthread_f func, void *arg)
     thread_create_clone(cthread_runner, (void*) result, stack_p, tid_p);
 }
 
-void *cthread_join(volatile struct cthread *thread)
+void *cthread_join(volatile cthread_t *thread)
 {
     while(!thread->is_finished)
         sched_yield();
@@ -178,13 +178,13 @@ void *cthread_join(volatile struct cthread *thread)
     return thread->returned_code;
 }
 
-void ctread_exit(struct cthread *thread, int retcode)
+void ctread_exit(cthread_t *thread, int retcode)
 {
     *((int *)thread->returned_code) = retcode;
     longjmp(thread->jmp, 1);
 }
 
-void cthread_detach(struct cthread *thread)
+void cthread_detach(cthread_t *thread)
 {
     spin_lock(&thread->lock);
     if(thread->is_finished)
@@ -193,7 +193,7 @@ void cthread_detach(struct cthread *thread)
     spin_unlock(&thread->lock);
 }
 
-void cthread_destroy(struct cthread *thread)
+void cthread_destroy(cthread_t *thread)
 {
     printf("thread is destroyed\n");
     spin_lock(&last_stack_lost);
