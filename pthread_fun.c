@@ -1,4 +1,4 @@
-/* UNIX */
+/* for the Linux-like System */
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
