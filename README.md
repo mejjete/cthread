@@ -1,3 +1,3 @@
-# Pthread  library
+# Cthread library (pthread.h)
 
-My own interpretation pthread.h 
+My own implementation pthread.h 
